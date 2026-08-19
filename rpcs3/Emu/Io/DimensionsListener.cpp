@@ -40,6 +40,7 @@ namespace
 	std::thread g_listener_thread;
 	std::atomic<bool> g_listener_running{false};
 	std::atomic<socket_t> g_listen_sock{invalid_sock};
+	constexpr auto move_pickup_delay = std::chrono::milliseconds(500);
 
 #ifdef _WIN32
 	std::thread g_picker_thread;
@@ -192,6 +193,14 @@ namespace
 				dim_listener_log.error("Rejected MOVE source: pad=%d index=%d", old_pad, old_index);
 				return;
 			}
+
+			if (!g_dimensionstoypad.temp_remove(old_index))
+			{
+				dim_listener_log.error("Ignored MOVE from empty source slot: pad=%d index=%d", old_pad, old_index);
+				return;
+			}
+
+			std::this_thread::sleep_for(move_pickup_delay);
 			g_dimensionstoypad.move_figure(pad, index, old_pad, old_index);
 			dim_listener_log.notice("MOVE %d/%d -> %d/%d", old_pad, old_index, pad, index);
 			break;

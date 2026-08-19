@@ -108,44 +108,6 @@ int gui_application::exec()
 		func();
 	};
 
-	if (!rpcs3::is_release_build() && !rpcs3::is_local_build())
-	{
-		steps->push_back([this]()
-		{
-			const std::string_view branch_name = rpcs3::get_full_branch();
-			gui_log.warning("Experimental Build Warning! Build origin: %s", branch_name);
-
-			QMessageBox* msg = new QMessageBox();
-			msg->setAttribute(Qt::WA_DeleteOnClose);
-			msg->setWindowModality(Qt::WindowModal);
-			msg->setWindowTitle(tr("Experimental Build Warning"));
-			msg->setIcon(QMessageBox::Critical);
-			msg->setTextFormat(Qt::RichText);
-			msg->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-			msg->setDefaultButton(QMessageBox::No);
-			msg->setText(gui::utils::make_paragraph(tr(
-				"Please understand that this build is not an official RPCS3 release.\n"
-				"This build contains changes that may break games, or even <b>damage</b> your data.\n"
-				"We recommend to download and use the official build from the %0.\n"
-				"\n"
-				"Build origin: %1\n"
-				"Do you wish to use this build anyway?")
-				.arg(gui::utils::make_link(tr("RPCS3 website"), "https://rpcs3.net/download"))
-				.arg(Qt::convertFromPlainText(branch_name.data()))));
-			msg->layout()->setSizeConstraint(QLayout::SetFixedSize);
-			connect(msg, &QMessageBox::finished, this, [this](int)
-			{
-				const QMessageBox* box = qobject_cast<QMessageBox*>(sender());
-				if (!box || box->standardButton(box->clickedButton()) == QMessageBox::No)
-				{
-					Emu.Quit(true);
-					return;
-				}
-				m_show_next_dialog();
-			});
-			msg->open();
-		});
-	}
 #ifdef __linux__
 	const bool is_flatpak = qEnvironmentVariableIsSet("FLATPAK_ID");
 	const bool is_snap = qEnvironmentVariableIsSet("SNAP");
