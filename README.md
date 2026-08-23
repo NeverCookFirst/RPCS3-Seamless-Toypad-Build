@@ -6,11 +6,11 @@ It is the RPCS3 counterpart of [harrysof/Cemu-2.6-Remote-Toypad-Build](https://g
 
 RPCS3's own Dimensions Manager is untouched and still works normally. This is an additional interface, not a replacement.
 
-## Demo
+## Video guide
 
-[![LEGO Dimensions — Seamless Toypad RPCS3 gameplay](https://img.youtube.com/vi/4oqdOx-BNsQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=4oqdOx-BNsQ)
+[![RPCS3 Seamless Toypad Build — setup guide](https://img.youtube.com/vi/VkkL2L1ESCU/maxresdefault.jpg)](https://www.youtube.com/watch?v=VkkL2L1ESCU)
 
-Swapping figures mid-game straight from the controller — no pausing, no alt-tab, no mouse.
+Setup from scratch, plus swapping figures mid-game straight from the controller — no pausing, no alt-tab, no mouse.
 
 ## Why
 
