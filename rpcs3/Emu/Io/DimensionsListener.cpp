@@ -119,6 +119,19 @@ namespace
 		return true;
 	}
 
+	bool send_all(socket_t s, const u8* data, usz len)
+	{
+		while (len != 0)
+		{
+			const auto sent = ::send(s, reinterpret_cast<const char*>(data), static_cast<int>(len), 0);
+			if (sent <= 0)
+				return false;
+			data += sent;
+			len -= static_cast<usz>(sent);
+		}
+		return true;
+	}
+
 	u16 listener_port()
 	{
 		if (const char* env = std::getenv("RPCS3_TOYPAD_PORT"))
@@ -140,7 +153,9 @@ namespace
 		const u8 pad = header[1];
 		const u8 index = header[2];
 
-		if (pad < 1 || pad > 3 || index >= 7)
+		// GET_LED (0x04) carries no pad/index (they're 0), so skip the slot
+		// validation for it - it would otherwise be rejected below.
+		if (cmd != 0x04 && (pad < 1 || pad > 3 || index >= 7))
 		{
 			dim_listener_log.error("Rejected message: cmd=0x%02x pad=%d index=%d", cmd, pad, index);
 			return;
@@ -203,6 +218,32 @@ namespace
 			std::this_thread::sleep_for(move_pickup_delay);
 			g_dimensionstoypad.move_figure(pad, index, old_pad, old_index);
 			dim_listener_log.notice("MOVE %d/%d -> %d/%d", old_pad, old_index, pad, index);
+			break;
+		}
+		case 0x04: // GET_LED - return the current LED snapshot for the app's poll
+		{
+			const auto states = g_dimensionstoypad.get_led_states();
+			const u8 serial = g_dimensionstoypad.get_led_serial();
+
+			u8 response[3 + 3 * 9] = {};
+			response[0] = 0x4C; // 'L' magic
+			response[1] = serial;
+			response[2] = 0x03; // region count
+			for (usz i = 0; i < 3; ++i)
+			{
+				const usz off = 3 + i * 9;
+				response[off + 0] = states[i].pad;
+				response[off + 1] = states[i].mode;
+				response[off + 2] = states[i].r;
+				response[off + 3] = states[i].g;
+				response[off + 4] = states[i].b;
+				response[off + 5] = states[i].on_ms;
+				response[off + 6] = states[i].off_ms;
+				response[off + 7] = states[i].count;
+				response[off + 8] = states[i].speed_ms;
+			}
+			if (!send_all(client, response, sizeof(response)))
+				dim_listener_log.error("Failed to send GET_LED response");
 			break;
 		}
 		default:
