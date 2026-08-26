@@ -551,6 +551,161 @@ std::optional<std::array<u8, 32>> dimensions_toypad::pop_added_removed_response(
 	return response;
 }
 
+namespace
+{
+	// Region index (center/left/right) for a wire pad value: 1=center, 2=left, 3=right.
+	u8 led_pad_index(u8 pad)
+	{
+		switch (pad)
+		{
+		case 1: return 0; // center
+		case 2: return 1; // left
+		case 3: return 2; // right
+		}
+		return 0;
+	}
+	// Wire pad value for a region index (the "All" commands enumerate center, left, right).
+	u8 led_region_pad(u8 region)
+	{
+		static constexpr std::array<u8, 3> pads = {1, 2, 3};
+		return pads[region];
+	}
+} // namespace
+
+void dimensions_toypad::set_led_state(u8 pad, u8 mode, u8 r, u8 g, u8 b, u8 on_ms, u8 off_ms, u8 count, u8 speed_ms)
+{
+	std::lock_guard lock(m_led_mutex);
+	auto apply = [&](u8 target_pad)
+	{
+		led_pad_state& state = m_led_state[led_pad_index(target_pad)];
+		if (state.mode == mode && state.r == r && state.g == g && state.b == b &&
+			state.on_ms == on_ms && state.off_ms == off_ms && state.count == count && state.speed_ms == speed_ms)
+			return; // unchanged - don't bump the poll serial
+		state.pad = target_pad;
+		state.mode = mode;
+		state.r = r;
+		state.g = g;
+		state.b = b;
+		state.on_ms = on_ms;
+		state.off_ms = off_ms;
+		state.count = count;
+		state.speed_ms = speed_ms;
+		++m_led_serial;
+		dimensions_log.notice("Toypad LED set: pad %d mode %d rgb %d,%d,%d (serial %d)",
+			state.pad, state.mode, state.r, state.g, state.b, m_led_serial);
+	};
+	if (pad == 0) // all pads
+	{
+		apply(1);
+		apply(2);
+		apply(3);
+	}
+	else
+	{
+		apply(pad);
+	}
+}
+
+dimensions_toypad::led_pad_state dimensions_toypad::get_led_state(u8 pad)
+{
+	std::lock_guard lock(m_led_mutex);
+	return m_led_state[led_pad_index(pad)];
+}
+
+std::array<dimensions_toypad::led_pad_state, 3> dimensions_toypad::get_led_states()
+{
+	std::lock_guard lock(m_led_mutex);
+	return m_led_state;
+}
+
+u8 dimensions_toypad::get_led_serial()
+{
+	std::lock_guard lock(m_led_mutex);
+	return m_led_serial;
+}
+
+// Parses the game's HID LED commands (0xC0..0xC8) and mirrors the per-region
+// state into m_led_state. Same byte layout as the Cemu fork (shared
+// reverse-engineering): header {0x55, len, command, messageId, ...}, args from
+// buf[4]; "All" commands enumerate center, left, right, each with an on/off
+// byte first.
+void dimensions_toypad::handle_led_command(const u8* buf, u32 buf_size)
+{
+	if (buf_size < 25)
+		return;
+	const u8 command = buf[2];
+	dimensions_log.notice("Toypad LED command 0x%02x seq %d bytes %02x %02x %02x %02x %02x %02x",
+		command, buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9]);
+	switch (command)
+	{
+	case 0xC0: // Color: pad, r, g, b
+		set_led_state(buf[4], 1, buf[5], buf[6], buf[7], 0, 0, 0, 0);
+		break;
+	case 0xC1: // Get Pad Color - query only, no state change
+		break;
+	case 0xC2: // Fade: pad, tickTime, tickCount, r, g, b
+		set_led_state(buf[4], 3, buf[7], buf[8], buf[9], 0, 0, buf[6], buf[5]);
+		break;
+	case 0xC3: // Flash: pad, on, off, count(0xFF=forever), r, g, b
+	{
+		const u8 count = (buf[7] == 0xFF) ? 0 : buf[7];
+		set_led_state(buf[4], 2, buf[8], buf[9], buf[10], buf[5], buf[6], count, 0);
+		break;
+	}
+	case 0xC4: // Fade Random: pad, tickTime, tickCount (colour left as-is)
+	{
+		const led_pad_state existing = get_led_state(buf[4]);
+		set_led_state(buf[4], 3, existing.r, existing.g, existing.b, 0, 0, buf[6], buf[5]);
+		break;
+	}
+	case 0xC6: // Fade All: per-region on/off, tickTime, tickCount, r, g, b
+	{
+		for (u8 region = 0; region < 3; ++region)
+		{
+			const u32 off = 4 + region * 6;
+			if (buf[off] == 0)
+			{
+				set_led_state(led_region_pad(region), 0, 0, 0, 0, 0, 0, 0, 0);
+				continue;
+			}
+			set_led_state(led_region_pad(region), 3, buf[off + 3], buf[off + 4], buf[off + 5], 0, 0, buf[off + 2], buf[off + 1]);
+		}
+		break;
+	}
+	case 0xC7: // Flash All: per-region on/off, on, off, count, r, g, b
+	{
+		for (u8 region = 0; region < 3; ++region)
+		{
+			const u32 off = 4 + region * 7;
+			if (buf[off] == 0)
+			{
+				set_led_state(led_region_pad(region), 0, 0, 0, 0, 0, 0, 0, 0);
+				continue;
+			}
+			const u8 count = (buf[off + 3] == 0xFF) ? 0 : buf[off + 3];
+			set_led_state(led_region_pad(region), 2, buf[off + 4], buf[off + 5], buf[off + 6], buf[off + 1], buf[off + 2], count, 0);
+		}
+		break;
+	}
+	case 0xC8: // Color All: per-region on/off, r, g, b
+	{
+		for (u8 region = 0; region < 3; ++region)
+		{
+			const u32 off = 4 + region * 4;
+			if (buf[off] == 0)
+			{
+				set_led_state(led_region_pad(region), 0, 0, 0, 0, 0, 0, 0, 0);
+				continue;
+			}
+			set_led_state(led_region_pad(region), 1, buf[off + 1], buf[off + 2], buf[off + 3], 0, 0, 0, 0);
+		}
+		break;
+	}
+	default:
+		break;
+	}
+}
+
 usb_device_dimensions::usb_device_dimensions(const std::array<u8, 7>& location)
 	: usb_device_emulated(location)
 {
@@ -659,6 +814,9 @@ void usb_device_dimensions::interrupt_transfer(u32 buf_size, u8* buf, u32 endpoi
 		case 0xC7: // Flash All
 		case 0xC8: // Color All
 		{
+			// Mirror the pad-region LED state out to the network listener so the
+			// LegoToypad app can render the pads glowing like a real toypad.
+			g_dimensionstoypad.handle_led_command(buf, buf_size);
 			// Send a blank response to acknowledge color has been sent to toypad
 			g_dimensionstoypad.get_blank_response(0x01, sequence, q_result);
 			break;
