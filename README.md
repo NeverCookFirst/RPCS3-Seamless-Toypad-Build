@@ -1,10 +1,12 @@
-# RPCS3 Seamless Toypad Build
+<h1 align="center">RPCS3 Seamless Toypad Build</h1>
 
 A modified [RPCS3](https://github.com/RPCS3/rpcs3) build that adds a loopback TCP listener for the emulated LEGO Dimensions Toypad, so figures can be loaded, removed or moved from a controller-driven companion app instead of the mouse-driven **Manage → Dimensions Manager** dialog — and so that app can read back the Toypad's LED state and render the pads glowing like the real hardware.
 
 It is the RPCS3 counterpart of [harrysof/Cemu-2.6-Remote-Toypad-Build](https://github.com/harrysof/Cemu-2.6-Remote-Toypad-Build) and speaks the same wire protocol, so [**LegoToypad**](https://github.com/harrysof/LegoToypad) works with it **unchanged** — the app does not even know whether Cemu or RPCS3 is on the other end of the socket.
 
 RPCS3's own Dimensions Manager is untouched and still works normally. This is an additional interface, not a replacement.
+
+Thanks [LEGO Dimensions Discord](https://discord.gg/PuXpBMFE4P) for support!
 
 ## Video guide
 
