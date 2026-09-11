@@ -183,7 +183,13 @@ namespace
 				const std::string path(reinterpret_cast<const char*>(path_buf.data()), path_len);
 				// Optional persistence: game writes go back to this .bin, same
 				// as loading it through the Dimensions Manager dialog.
-				file.open(path, fs::read + fs::write + fs::lock);
+				//
+				// Deliberately no fs::lock: that flag drops FILE_SHARE_WRITE
+				// (see Utilities/File.cpp), so once the emulator holds the .bin
+				// a second open of the same file - loading the same figure onto
+				// another pad, or the companion app reading/writing it - fails
+				// with a sharing violation. read+write shares it properly.
+				file.open(path, fs::read + fs::write);
 			}
 
 			// The listener contract (LegoToypad expects Cemu-fork behavior) is
