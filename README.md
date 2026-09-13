@@ -81,13 +81,14 @@ LOAD deliberately overwrites an occupied slot (remove first, then load), matchin
 
 ### LED mirror (`GET_LED`)
 
-LOAD/REMOVE/MOVE are fire-and-forget; `GET_LED` is the one command that answers. It returns a fixed 30-byte snapshot of what the game has the three LED regions doing:
+LOAD/REMOVE/MOVE are fire-and-forget; `GET_LED` is the one command that answers. It returns a fixed 40-byte snapshot (protocol version 2) of what the game has the three LED regions doing:
 
 ```
 [0]   0x4C  'L' magic
 [1]   serial       increments whenever any region actually changes
-[2]   0x03         region count
-[3..] 3 x 9 bytes: pad, mode, r, g, b, on_ms, off_ms, count, speed_ms
+[2]   0x02         protocol version
+[3]   0x03         region count
+[4..] 3 x 12 bytes: pad, mode, r, g, b, from_r, from_g, from_b, on_ms, off_ms, count, speed_ms
 ```
 
 | Field | Meaning |
@@ -95,6 +96,7 @@ LOAD/REMOVE/MOVE are fire-and-forget; `GET_LED` is the one command that answers.
 | `pad` | LED region — `1` centre, `2` left, `3` right |
 | `mode` | `0` off, `1` solid, `2` flash, `3` fade |
 | `r`, `g`, `b` | The colour the game set, verbatim |
+| `from_r`, `from_g`, `from_b` | For a fade, the colour the pad was already showing when the command landed; the real toypad cross-fades from it to `r/g/b` rather than ramping one colour's brightness |
 | `on_ms` / `off_ms` | Flash on and off durations, in Toypad ticks (~40ms each) |
 | `count` | Cycle count; `0` means "until the next command" (`0xFF` on the wire is normalized to `0`) |
 | `speed_ms` | Fade tick time |
@@ -103,7 +105,7 @@ The emulated Toypad builds this snapshot in `handle_led_command`, parsing the ga
 
 The **serial** only advances when a command actually changes a region's state — re-sending an identical command leaves it alone. A polling client can therefore skip snapshots it has already applied and never restart a flash mid-cycle.
 
-This is byte-for-byte the same snapshot the Cemu fork returns, so LegoToypad's LED mirror works against either emulator with no changes.
+This is the protocol version 2 snapshot the Cemu and shadPS4 listeners also return, so LegoToypad's LED mirror works against this emulator with no changes. (Version 1 was a 30-byte reply with no version byte and no `from_r/g/b`; the app now rejects it, which is why RPCS3 needed this update.)
 
 ## Code map
 
