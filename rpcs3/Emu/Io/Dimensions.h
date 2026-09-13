@@ -31,14 +31,17 @@ public:
 	std::optional<std::array<u8, 32>> pop_added_removed_response();
 
 	// Mirror a pad region's LED state ("keystone puzzle" glow). Same encoding
-	// and wire snapshot as the Cemu fork, so the LegoToypad controller app can
-	// render the pads glowing for RPCS3 too. mode: 0 off, 1 solid, 2 flash,
-	// 3 fade; pad: 1=center, 2=left, 3=right.
+	// and wire snapshot as the Cemu/RPCS3 protocol version 2, so the LegoToypad
+	// controller app can render the pads glowing for RPCS3 too. mode: 0 off,
+	// 1 solid, 2 flash, 3 fade; pad: 1=center, 2=left, 3=right. from_r/g/b is
+	// the colour the pad was already showing when a fade command landed - the
+	// real toypad cross-fades between that and r/g/b, not one colour's brightness.
 	struct led_pad_state
 	{
 		u8 pad = 0;
 		u8 mode = 0;
 		u8 r = 0, g = 0, b = 0;
+		u8 from_r = 0, from_g = 0, from_b = 0;
 		u8 on_ms = 0, off_ms = 0, count = 0, speed_ms = 0;
 	};
 	void handle_led_command(const u8* buf, u32 buf_size);

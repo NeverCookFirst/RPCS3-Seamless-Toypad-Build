@@ -630,6 +630,10 @@ void dimensions_toypad::set_led_state(u8 pad, u8 mode, u8 r, u8 g, u8 b, u8 on_m
 	auto apply = [&](u8 target_pad)
 	{
 		led_pad_state& state = m_led_state[led_pad_index(target_pad)];
+		// A fade's "from" colour is whatever the pad was already showing (or
+		// already fading towards) the moment this command lands, so a fade
+		// issued mid-fade still anchors to something on-screen.
+		const u8 from_r = state.r, from_g = state.g, from_b = state.b;
 		if (state.mode == mode && state.r == r && state.g == g && state.b == b &&
 			state.on_ms == on_ms && state.off_ms == off_ms && state.count == count && state.speed_ms == speed_ms)
 			return; // unchanged - don't bump the poll serial
@@ -638,6 +642,12 @@ void dimensions_toypad::set_led_state(u8 pad, u8 mode, u8 r, u8 g, u8 b, u8 on_m
 		state.r = r;
 		state.g = g;
 		state.b = b;
+		if (mode == 3) // Fade: remember the pre-command colour to cross-fade from
+		{
+			state.from_r = from_r;
+			state.from_g = from_g;
+			state.from_b = from_b;
+		}
 		state.on_ms = on_ms;
 		state.off_ms = off_ms;
 		state.count = count;

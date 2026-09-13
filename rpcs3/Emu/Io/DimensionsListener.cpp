@@ -41,6 +41,11 @@ namespace
 	std::atomic<bool> g_listener_running{false};
 	std::atomic<socket_t> g_listen_sock{invalid_sock};
 	constexpr auto move_pickup_delay = std::chrono::milliseconds(500);
+	// LED snapshot protocol version. v2 is a 40-byte reply that adds the
+	// pre-fade colour (from_r/g/b) alongside the target colour, so a client can
+	// render the real toypad's two-colour cross-fade. v1 was 30 bytes with no
+	// version byte; the companion app now requires v2.
+	constexpr u8 led_protocol_version = 2;
 
 #ifdef _WIN32
 	std::thread g_picker_thread;
@@ -231,22 +236,30 @@ namespace
 			const auto states = g_dimensionstoypad.get_led_states();
 			const u8 serial = g_dimensionstoypad.get_led_serial();
 
-			u8 response[3 + 3 * 9] = {};
+			// Wire format v2: { 'L', serial, protocol version, region count,
+			// then 3 regions x 12 bytes: pad, mode, r, g, b, from_r, from_g,
+			// from_b, on_ms, off_ms, count, speed_ms }. from_r/g/b is the
+			// pre-fade colour; see dim_listener_log and Dimensions.h.
+			u8 response[4 + 3 * 12] = {};
 			response[0] = 0x4C; // 'L' magic
 			response[1] = serial;
-			response[2] = 0x03; // region count
+			response[2] = led_protocol_version;
+			response[3] = 0x03; // region count
 			for (usz i = 0; i < 3; ++i)
 			{
-				const usz off = 3 + i * 9;
+				const usz off = 4 + i * 12;
 				response[off + 0] = states[i].pad;
 				response[off + 1] = states[i].mode;
 				response[off + 2] = states[i].r;
 				response[off + 3] = states[i].g;
 				response[off + 4] = states[i].b;
-				response[off + 5] = states[i].on_ms;
-				response[off + 6] = states[i].off_ms;
-				response[off + 7] = states[i].count;
-				response[off + 8] = states[i].speed_ms;
+				response[off + 5] = states[i].from_r;
+				response[off + 6] = states[i].from_g;
+				response[off + 7] = states[i].from_b;
+				response[off + 8] = states[i].on_ms;
+				response[off + 9] = states[i].off_ms;
+				response[off + 10] = states[i].count;
+				response[off + 11] = states[i].speed_ms;
 			}
 			if (!send_all(client, response, sizeof(response)))
 				dim_listener_log.error("Failed to send GET_LED response");
