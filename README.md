@@ -147,3 +147,10 @@ Base: upstream RPCS3 `0059e4e`, released here as **v0.0.42-19788-e06b68ef**.
 - [harrysof](https://github.com/harrysof) — [LegoToypad](https://github.com/harrysof/LegoToypad) and the [Cemu Remote Toypad build](https://github.com/harrysof/Cemu-2.6-Remote-Toypad-Build) whose protocol this implements.
 
 Not affiliated with the RPCS3 team, Sony, LEGO or Warner Bros. Interactive. Bring your own game dump and your own tag dumps.
+
+## Dimensions Recompiled handoff
+
+I have ended my work on Dimensions Recompiled. This repository is preserved as a read-only reference. The existing source and any release downloads remain available.
+
+- [Final Native GPU release](https://github.com/NeverCookFirst/DimensionsRecomp/releases/tag/v0.2.0)
+- [Project handoff and original build](https://github.com/NeverCookFirst/DimensionsRecomp/blob/main/PROJECT-HANDOFF.md)
